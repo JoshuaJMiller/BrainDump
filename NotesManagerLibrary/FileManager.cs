@@ -10,16 +10,59 @@ namespace NotesManagerLibrary
     public class FileManager
     {
         public string TargetDirectory { get; set; }
+        public string AppDataDirectory { get; set; }
+        public string HistoryFileName { get; set; }
+        public string HistoryPath { get; set; }
+
         private List<string> TableOfContents = new List<string>();
         public List<string> FileNames = new List<string>();
-        public int TOCCount = 0;
+        public List<string> DirectoryUniqueHistory = new List<string>();
+        public int TOCCount = 1;
         private StreamWriter SW;
         private StreamReader SR;
 
+        public FileManager(string p_targetDirectory, string p_appDataDirectory, string p_historyFileName)
+        {
+            TargetDirectory = p_targetDirectory;
+            AppDataDirectory = p_appDataDirectory;
+            HistoryFileName = p_historyFileName;
+            HistoryPath = Path.Combine(AppDataDirectory, HistoryFileName);
+        }
+
         public void Init()
         {
-            ProcessDirectory(AddFileNameToTableOfContents, TargetDirectory);
-            TOCCount = 0;
+            // First time running app:
+            // Create BrainDump Folder
+            // Create AppData folder
+            // Create DirectoryHistory.txt in AppData
+            // Update DirectoryHistory with current
+
+            if (!File.Exists(HistoryPath))
+            {
+                Directory.CreateDirectory(TargetDirectory);
+                Directory.CreateDirectory(AppDataDirectory);
+                SW = new StreamWriter(HistoryPath);
+                SW.Close();
+                UpdateDirectoryHistoryFile(TargetDirectory);
+            }
+
+            // Not first time running app:
+            // Load DirectoryHistory.txt into DirectoryUniqueHistory
+            // update TargetDirectory with last dir in list
+            else
+            {
+                LoadHistoryFromFile(HistoryPath);
+                TargetDirectory = DirectoryUniqueHistory.Last();
+            }
+
+            // Populate TOC
+            ProcessDirectory(AddFileNameToTableOfContents, TargetDirectory, false);
+        }
+
+        public void UpdateDirectoryHistoryFile(string p_targetDirectory)
+        {
+            UpdateDirectoryUniqueHistory(p_targetDirectory);
+            File.WriteAllLines(HistoryPath, DirectoryUniqueHistory);
         }
 
         public void Init(string p_targetDirectory)
@@ -31,26 +74,41 @@ namespace NotesManagerLibrary
             ProcessDirectory(AddFileNameToTableOfContents, TargetDirectory, false);
             
             // Ensure TOCCOunt is 0
-            TOCCount = 0;
+            TOCCount = 1;
         }
 
         public void Init(string p_targetDirectory, string p_folderName)
         {
             // Add "BrainDump" Folder if it doesn't exist
-            if (!Directory.Exists(p_folderName))
+            string fullPath = Path.Combine(p_targetDirectory, p_folderName);
+            if (!Directory.Exists(fullPath))
             {
+                // create and set as target directory
                 TargetDirectory = CreateAndGetNewFolder(p_targetDirectory, p_folderName);
             }
             else
             {
-                TargetDirectory = Path.Combine(p_targetDirectory, p_folderName);
+                // already exists, so set it to target directory
+                TargetDirectory = fullPath;
             }
+
+            // Add Folder and dir history file
+            //CreateNewFolder(@"C:\Users\joshu\Documents\BDData\", "DirectoryHistory");
+            Directory.CreateDirectory(@"C:\Users\joshu\Documents\RecentDirectoriesCRAP\");
+            SW = new StreamWriter(@"C:\Users\joshu\Documents\RecentDirectoriesCRAP\historytest1.txt");
+            SW.Close();
+
+            // Add BrainDump path to DirectoryUniqueHistory
+            UpdateDirectoryUniqueHistory(fullPath);
+
+            // Write DirectoryUniqueHistory to dir history file
+            File.WriteAllLines(@"C:\Users\joshu\Documents\RecentDirectoriesCRAP\historytest1.txt", DirectoryUniqueHistory);
 
             // Create TOC from currect directory
             ProcessDirectory(AddFileNameToTableOfContents, TargetDirectory, false);
 
             // Ensure TOCCOunt is 0
-            TOCCount = 0;
+            TOCCount = 1;
         }
         public List<string> getTOC()
         {
@@ -61,6 +119,7 @@ namespace NotesManagerLibrary
         {
             string sub = TOCCount + " - " + p_path.Substring(p_targetDirectory.Length + 1);
             TableOfContents.Add(sub);
+            TOCCount++;
         }
 
         public void AddFileNameToList(string p_path, string p_targetDirectory)
@@ -77,7 +136,6 @@ namespace NotesManagerLibrary
                 string[] fileEntries = Directory.GetFiles(p_targetDirectory);
                 foreach (string fileName in fileEntries)
                 {
-                    TOCCount++;
                     p_ProcessFile(fileName, p_targetDirectory);
                 }
             }
@@ -87,7 +145,6 @@ namespace NotesManagerLibrary
                 string[] fileEntries = Directory.GetFiles(p_targetDirectory);
                 foreach (string fileName in fileEntries)
                 {
-                    TOCCount++;
                     p_ProcessFile(fileName, p_targetDirectory);
                 }
 
@@ -153,12 +210,12 @@ namespace NotesManagerLibrary
             ProcessDirectory(AddFileNameToList, p_directory, false);
 
             // check FileNames for p_filename
-            int postfix = 1;
+            int postfix = 2;
             string name = p_filename;
             while (FileNames.IndexOf(name) != -1)
             {
-                postfix++;
                 name = p_filename + " (" + postfix + ")";
+                postfix++;
             }
             return name;
         }
@@ -177,11 +234,40 @@ namespace NotesManagerLibrary
             string pathString = Path.Combine(p_directory, p_folderName);
             Directory.CreateDirectory(pathString);
         }
+
         public string CreateAndGetNewFolder(string p_directory, string p_folderName)
         {
             string pathString = Path.Combine(p_directory, p_folderName);
             Directory.CreateDirectory(pathString);
             return pathString;
+        }
+
+        public void UpdateDirectoryUniqueHistory(string p_path)
+        {
+            // Keep history in order, removing duplicates
+            int index = DirectoryUniqueHistory.IndexOf(p_path);
+            if (index == -1)
+            {
+                DirectoryUniqueHistory.Add(p_path);
+            }
+            else
+            {
+                DirectoryUniqueHistory.RemoveAt(index);
+                DirectoryUniqueHistory.Add(p_path);
+            }
+        }
+
+        public void LoadHistoryFromFile(string p_path)
+        {
+            // maybe try catch?
+            if (File.Exists(p_path))
+            {
+                DirectoryUniqueHistory = File.ReadAllLines(p_path).ToList();
+            }
+            else
+            {
+                // log missing path??
+            }
         }
     }
 }

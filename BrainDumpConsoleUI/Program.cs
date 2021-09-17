@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Diagnostics;
 using System.Security;
 using System.ComponentModel;
@@ -15,9 +16,10 @@ namespace BrainDumpConsoleUI
     class Program
     {
         private static string Title = "---------------- BrainDump 1.0 ----------------";
-        private static string DefaultFolderName = "BrainDump";
-        public static string NoteLocation = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        private static FileManager FM = new FileManager();
+        public static string NoteLocation = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "BrainDump");
+        public static string AppDataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "AppData");
+        public static string DirectoryHistoryFilename = "DirectoryHistory.txt";
+        public static FileManager FM { get; set; }
         private static List<string> TOC = new List<string>();
         private static StringFudger stringFudger = new StringFudger();
 
@@ -25,8 +27,9 @@ namespace BrainDumpConsoleUI
         {
             try
             {
+                FM = new FileManager(NoteLocation, AppDataDirectory, DirectoryHistoryFilename);
+                FM.Init();
                 RunIntro(Title);
-                InitializeFileManager();
                 TOC = FM.getTOC();
                 LaunchHome();
             }
@@ -34,62 +37,8 @@ namespace BrainDumpConsoleUI
             {
                 Console.WriteLine(e.Message);
             }
-            //RunTests();
-        }
-        private static void RunTests()
-        {
-            //List<string> stringList = new List<string> { "ricky", "bobby", "sue" };
-            //List<int> intList = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
-            // ConsoleUIControllerTest ConsoleUIControllerTest1 = new ConsoleUIControllerTest();
-            Printer Printer1 = new Printer();
-
-            //Printer1.PrintList<string>(stringList);
-            //Printer1.PrintList(intList);
-            //Console.WriteLine("----------------");
-
-            //RecursiveFileProcessor fileProcessor = new RecursiveFileProcessor();
-            //List<string> Paths = new List<string> { "C:\\Users\\joshu\\source\\repos\\Education\\C#\\Demo\\TextFiles\\test100.txt", "C:\\Users\\joshu\\source\\repos\\Education\\C#\\Demo\\TextFiles\\test9101.txt", "C:\\Users\\joshu\\source\\repos\\Education\\C#\\Demo\\TextFiles\\test5.txt", "C:\\Users\\joshu\\source\\repos\\Education\\C#\\Demo\\TextFiles\\test9101.txt", "C:\\Users\\joshu\\source\\repos\\Education\\C#\\Demo\\TextFiles\\TestFolder" };
-            ////fileProcessor.run(Paths);
-            //fileProcessor.ProcessDirectory("C:\\Users\\joshu\\source\\repos\\Education\\C#\\Demo\\TextFiles\\TestFolder");
-
-            //ConsoleUIControllerTest1.LaunchExplorer();
-            //ConsoleUIControllerTest1.OpenTextWithProgram("C:\\Program Files\\Sublime Text\\sublime_text.exe");
-
-
-            //set TargetDirectory
-            //fileProcessor.TargetDirectory = "C:\\Users\\joshu\\source\\repos\\Education\\C#\\Demo\\TextFiles";
-            //fileProcessor.ProcessDirectory(fileProcessor.PrintPath, fileProcessor.TargetDirectory);
-            //Console.WriteLine(fileProcessor.TargetDirectory);
-            //fileProcessor.ProcessDirectory(fileProcessor.TargetDirectory);
-
-            FileManager FM = new FileManager();
-            FM.TargetDirectory = "C:\\Users\\joshu\\source\\repos\\Education\\C#\\Demo\\TextFiles";
-            //FM.ProcessDirectory(PrintFileName, FM.TargetDirectory);
-            FM.ProcessDirectory(FM.AddFileNameToTableOfContents, FM.TargetDirectory);
-            List<string> TOC = new List<string>(FM.getTOC());
-            Printer1.PrintList(TOC);
-
         }
 
-        private static void InitializeFileManager()
-        {
-            // FUTURE: add local folder with xml containing recent directories used
-            //
-            // if target directory xml exists, initialize FM with the last directory notes were saved to
-            if (/*some local xml exists*/false)
-            {
-                string currentDirectory = /*parsingFuntionToGetDir();*/
-                NoteLocation = currentDirectory;
-                FM.Init(NoteLocation);
-            }
-
-            // if not, use default and add BrainDump folder
-            else
-            {
-                FM.Init(NoteLocation, DefaultFolderName);
-                NoteLocation = FM.TargetDirectory;
-            }
-        }
         private static void RunIntro(string p_text)
         {
             Console.Write(new string(' ', (Console.WindowWidth - p_text.Length) / 2));
@@ -99,7 +48,7 @@ namespace BrainDumpConsoleUI
 
         private static void LaunchHome()
         {
-            Console.WriteLine($"Working in: {NoteLocation}");
+            Console.WriteLine($"Working in: {FM.TargetDirectory}");
             Console.WriteLine();
             Console.WriteLine("\tMenu:");
             Console.WriteLine();
@@ -128,12 +77,14 @@ namespace BrainDumpConsoleUI
 
         private static void NewNote()
         {
-            Console.WriteLine($"\n\tType folder path or hit enter to save new note here: {NoteLocation}");
+            Console.WriteLine($"\n\tType folder path or hit enter to save new note here: {FM.TargetDirectory}");
             Console.Write("> ");
             string entry = Console.ReadLine();
             if (!string.IsNullOrWhiteSpace(entry))
             {
                 NoteLocation = entry;
+                FM.UpdateDirectoryHistoryFile(NoteLocation);
+                FM.TargetDirectory = NoteLocation;
             }
 
             Console.WriteLine("\n\tEnter filename: ");
@@ -143,16 +94,16 @@ namespace BrainDumpConsoleUI
             Console.WriteLine("\n\tEnter text: (enter \"^S\" to save)");
             Console.Write("> ");
             string text = createTextToWrite("^S");
-            //trim white space?
-
+            // Trim white space
+            //text.TrimEnd();
 
             if (string.IsNullOrWhiteSpace(filename))
             {
-                FM.AddTextFile(NoteLocation, text);
+                FM.AddTextFile(FM.TargetDirectory, text);
             }
             else
             {
-                FM.AddTextFile(NoteLocation, text, filename);
+                FM.AddTextFile(FM.TargetDirectory, text, filename);
             }
         }
 
